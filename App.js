@@ -1,16 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { StyleSheet, Text, View, Platform, TextInput, KeyboardAvoidingView, ImageBackground } from 'react-native';
+import { ActivityIndicator, ImageBackground, KeyboardAvoidingView, Text, View, StyleSheet } from 'react-native';
 
-import getImageForWeather from './utils/getImageForWeather'
 
 import SearchInput from './components/SearchInput';
+import { fetchLocationId, fetchWeather } from './utils/api';
+import getImageForWeather from './utils/getImageForWeather';
+
+
 
 export default class App extends React.Component {
   constructor(props) {
     super(props)
     this.state = {
-      location: ''
+      loading: false,
+      error: false,
+      location: '',
+      temperature: 0,
+      weather: '',
     }
   }
 
@@ -18,48 +25,99 @@ export default class App extends React.Component {
     this.handleUpdateLocation('San Francisco')
   }
 
-  handleUpdateLocation = city => {
-    this.setState({
-      location: city,
+  handleUpdateLocation = async city => {
+    if (!city) return
+
+    this.setState({loading: true}, async() =>{
+      try {
+        const locationId = await fetchLocationId(city)
+        const { location, weather, temperature } = await fetchWeather(
+          locationId,
+        )
+
+        this.setState({
+          loading: false,
+          error: false,
+          location,
+          weather,
+          temperature,
+        })
+      } catch (e) {
+        this.setState({
+          loading:false,
+          error:true
+        })
+      }
     })
   }
 
   render() {
-    const {location} = this.state
+    const {
+      loading,
+      error,
+      location,
+      weather,
+      temperature,      
+    } = this.state
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior="padding">
 
+      <StatusBar barStyle="light-content" />
       <ImageBackground
-        source={getImageForWeather('Clear')}
+        source={getImageForWeather(weather)}
         style={styles.imageContainer}
         imageStyle={styles.image}
       >
-        <View style={styles.detailsContainer}>
+      <View style={styles.detailsContainer}>
 
-          <Text style={[styles.largeText, styles.textStyle]}>
-            {location}
-        </Text>
-          <Text style={[styles.smallText, styles.textStyle]}>
-            Light Cloud
-        </Text>
-          <Text style={[styles.largeText, styles.textStyle]}>
-            24*
-        </Text>
-          <SearchInput
-            placeholder="Search any city"
-            onSubmit={this.handleUpdateLocation}
-          />
-        </View>
+        <ActivityIndicator
+          animating = {loading}
+          color="white"
+          size="large"
+        />
 
-        <StatusBar style="auto" />
+        {!loading &&(
+          <View>
+            {error &&(
+              <Text style={[styles.smallText, styles.textStyle]}>
+              Could not load weather, please try a different city.
+              </Text>
+            )}
+
+            {!error && (
+              <View>
+                <Text 
+                  style={[styles.largeText, styles.textStyle]}
+                >
+                  {location}
+                </Text>
+                <Text 
+                  style={[styles.smallText, styles.textStyle]}>
+                  {weather}
+                </Text>
+                <Text 
+                  style={[styles.largeText, styles.textStyle]}>
+                  {`${Math.round(temperature)}o`}
+                </Text>
+              </View>
+            )}
+            <SearchInput
+              placeholder="Search any city"
+              onSubmit={this.handleUpdateLocation}
+            />
+          </View>
+        )}
+      </View>
       </ImageBackground>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+
   );
   }
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -93,3 +151,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
 });
+
